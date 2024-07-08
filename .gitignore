@@ -1,2 +1,5 @@
-data/*
+/wandb/
+/phi3-mini-VD/*
+!/phi3-mini-VD/checkpoint-10000
+/data/*
 
