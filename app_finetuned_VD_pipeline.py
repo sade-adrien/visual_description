@@ -13,6 +13,8 @@ device = 'cuda:0'
 image_to_text_model = 'llava-hf/llava-v1.6-mistral-7b-hf'
 segmentation_model = "IDEA-Research/grounding-dino-base"
 embeddings_model = 'Alibaba-NLP/gte-large-en-v1.5'
+llm_model = "microsoft/Phi-3-mini-4k-instruct"
+adapter_name = "phi3-mini-VD/checkpoint-10000"
 
 #def fcts
 def load_models():
@@ -39,8 +41,16 @@ def load_models():
                                         trust_remote_code=True,
                                         cache_dir='/mnt/esperanto/et/huggingface/hub',
                                         )
+
+    tokenizer_llm = AutoTokenizer.from_pretrained(llm_model)
+    model_llm = AutoModelForCausalLM.from_pretrained(llm_model,
+                                                torch_dtype = torch.float16,
+                                                device_map=device,
+                                                attn_implementation='flash_attention_2',
+                                                cache_dir='/mnt/esperanto/et/huggingface/hub',
+                                                )
                         
-    return model_itt, processor_itt, model_segmentation, processor_segmentation, model_embeddings, tokenizer_embeddings
+    return model_itt, processor_itt, model_segmentation, processor_segmentation, model_embeddings, tokenizer_embeddings, model_llm, tokenizer_llm
 
 def get_labels_color(labels):
     all_colors = ['red', 'blue', 'green', 'yellow', 'orange', 'purple', 'pink', 'brown', 'gray', 'cyan', 'magenta', 'lime', 'teal', 'navy', 'maroon', 'olive', 'indigo', 'violet', 'coral', 'salmon', 'gold', 'silver', 'turquoise', 'lavender', 'beige', 'tan', 'mint', 'plum', 'khaki', 'ivory', 'honeydew']
@@ -50,9 +60,7 @@ def get_labels_color(labels):
 
     return dict(labels_to_colors)
 
-def save_image_with_boxes(image, segments):
-    path = './output_image.jpg'
-
+def save_image_with_boxes(image, segments, path='./output_image.jpg'):
     boxes, labels, scores = segments[0]['boxes'], segments[0]['labels'], segments[0]['scores']
     
     labels_to_colors = get_labels_color(labels)
@@ -100,10 +108,11 @@ def get_labels(model, processor, image, n_objects=10, n_parallel_inference=3):
             list_outputs = []
             for output in outputs:
                 list_outputs.append(ast.literal_eval(output))
-            if len(list_outputs[-1]['objects']) <= n_objects*1.2 and len(list_outputs[-1]['objects']) >= n_objects*0.8:
-                generation_success = True
-            else:
-                print(f"Failed to generate the right number of labels: {len(list_outputs[-1]['objects'])}")
+            # if len(list_outputs[-1]['objects']) <= n_objects*1.2 and len(list_outputs[-1]['objects']) >= n_objects*0.8:
+            generation_success = True
+            # else:
+            #     print(f"Failed to generate the right number of labels: {len(list_outputs[-1]['objects'])}")
+
         except:
             print(f"An error occured during json evaluation of generated output: {outputs}")
             continue
@@ -231,7 +240,7 @@ def merge_labels(model, tokenizer, segments, display_similarity=False, threshold
         all_merged = True
         for k in range(len(segments[0]['labels'])):
             if segments[0]['labels'][k] in similar_pairs.keys():
-                print(f"Merging label '{segments[0]['labels'][k]}' into '{similar_pairs[segments[0]['labels'][k]]}'...")
+                #print(f"Merging label '{segments[0]['labels'][k]}' into '{similar_pairs[segments[0]['labels'][k]]}'...")
                 segments[0]['labels'][k] = similar_pairs[segments[0]['labels'][k]]
                 all_merged = False
 
@@ -239,7 +248,7 @@ def merge_labels(model, tokenizer, segments, display_similarity=False, threshold
     
 def controled_generation(model, processor, image, n_objects=10, **kwargs):
     n_parallel = len(image)
-    prompt = f"""[INST] <image>\nAnalyze the scene and infer what it is representing. Given the scene, list the {n_objects} objects or entities most likely to be part of the scene and most important to spot (use ONE SIMPLE WORD ONLY to describe an object or entity - this will be reprenting a category in large meaning). Ignore objects that are small or irrelevant to a blind person. Answer by filling out the following JSON format. Your answer must be parse-able with python's ast.literal_eval() - DO NOT ADD ANYTHING ELSE:
+    prompt = f"""[INST] <image>\nAnalyze the scene and infer what it is representing. Given the scene, list 5 to 10 objects or entities most likely to be part of the scene and most important to spot (use ONE SIMPLE WORD ONLY to describe an object or entity - this will be reprenting a category in large meaning). Ignore objects that are small or irrelevant to a blind person. Answer by filling out the following JSON format. Your answer must be parse-able with python's ast.literal_eval() - DO NOT ADD ANYTHING ELSE:
     {{
         "title": "short_scene_title",
         "objects": {[f"object_{i}" for i in range(n_objects)]}
@@ -288,6 +297,38 @@ def post_processing(model_embeddings, tokenizer_embeddings, segments):
 
     return segments_cleaned
 
+def run_image_description_phi(segments, model, tokenizer, image):
+    system_prompt = "You are an AI model designed to help visually impaired people. Your task is to provide a comprehensive description of the image, locating important objects to guide disabled people through the scene."
+    
+    width, height = image.size
+    segments[0]['boxes'][:, 0::2] /= width
+    segments[0]['boxes'][:, 1::2] /= height
+
+    boxes = [row for row in segments[0]['boxes'].tolist()]
+    boxes = [str([round(x,2) for x in row]) for row in boxes]
+    labels = segments[0]['labels']
+    box_prompt = '\n'.join(sorted([a + ' ' + b for a,b in zip(labels, boxes)]))
+
+    title = segments[0]['title']
+    question_prompt = f"Below is a description of a {title} scene, along with a list of objects present in the scene along with their coordinates following the format 'object [x_min, y_min, x_max, y_max]'. Provide a descriptive paragraph using a human-like description, do not mention coordinates. Only use the position information and infer from it, do not add any comment or guess. Remain factual and avoid unnecessary embellishments, keep it simple."
+
+    sample_prompt = f"""<|system|>
+{system_prompt}<|end|>
+<|user|>
+{question_prompt}
+{box_prompt}<|end|>
+<|assistant|>
+"""
+
+    inputs = tokenizer(sample_prompt, return_tensors='pt').to(device)
+
+    with torch.no_grad():
+        outputs = model.generate(**inputs, max_new_tokens=500)
+    
+    outputs = tokenizer.decode(outputs[0, inputs.input_ids.shape[1]:], skip_special_tokens=True)
+
+    return outputs
+
 
 def show_page1():
     st.set_page_config(layout="wide")
@@ -297,7 +338,7 @@ def show_page1():
 
     if 'models_loaded' not in st.session_state:
         with st.spinner('Loading models...'):
-            model_itt, processor_itt, model_segmentation, processor_segmentation, model_embeddings, tokenizer_embeddings = load_models()
+            model_itt, processor_itt, model_segmentation, processor_segmentation, model_embeddings, tokenizer_embeddings, model_llm, tokenizer_llm = load_models()
             st.session_state['models_loaded'] = True
 
             st.session_state['model_itt'] = model_itt
@@ -306,6 +347,8 @@ def show_page1():
             st.session_state['processor_segmentation'] = processor_segmentation
             st.session_state['model_embeddings'] = model_embeddings
             st.session_state['tokenizer_embeddings'] = tokenizer_embeddings
+            st.session_state['model_llm'] = model_llm
+            st.session_state['tokenizer_llm'] = tokenizer_llm
 
     else:
         model_itt = st.session_state['model_itt']
@@ -314,6 +357,8 @@ def show_page1():
         processor_segmentation = st.session_state['processor_segmentation']
         model_embeddings = st.session_state['model_embeddings']
         tokenizer_embeddings = st.session_state['tokenizer_embeddings']
+        model_llm = st.session_state['model_llm']
+        tokenizer_llm = st.session_state['tokenizer_llm']
 
     with col1:
         image_file = st.file_uploader("Upload Scene Image", type=["png","jpg","jpeg"])
@@ -325,22 +370,25 @@ def show_page1():
     
 
     if segment_button and (image_file is not None):
-        list_labels, title = get_labels(model_itt, processor_itt, image, n_objects=10, n_parallel_inference=3)
+        list_labels, title = get_labels(model_itt, processor_itt, image, n_objects=7, n_parallel_inference=3)
 
         segments = run_segmentation(model_segmentation, processor_segmentation, image, list_labels)
 
-        with col2:
-            st.markdown("<br><br><br><br><br><br><br><br>", unsafe_allow_html=True)
-            st.write(list_labels)
-
         segments_postprocessed = post_processing(model_embeddings, tokenizer_embeddings, segments)
 
-        output_path = save_image_with_boxes(image, segments_postprocessed)
-    
+        output_path = save_image_with_boxes(image, segments_postprocessed,'data/output_examples/output_image.jpg')
     
     if output_path is not None:
         output_image = Image.open(output_path).convert('RGB')
         st.image(output_image, caption=title, use_column_width=True)
+
+
+        with col2:
+            segments_postprocessed[0]['title'] = title
+            outputs = run_image_description_phi(segments_postprocessed, model_llm, tokenizer_llm, image)
+
+            st.write(outputs)
+
 
 
 
