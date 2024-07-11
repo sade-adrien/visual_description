@@ -1,5 +1,5 @@
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = "0"
+os.environ['CUDA_VISIBLE_DEVICES'] = "1"
 
 import streamlit as st
 from transformers import AutoProcessor, AutoTokenizer, AutoModel, AutoModelForCausalLM, LlavaNextForConditionalGeneration, AutoModelForZeroShotObjectDetection
