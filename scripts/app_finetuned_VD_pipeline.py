@@ -1,9 +1,10 @@
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = "1"
+os.environ['CUDA_VISIBLE_DEVICES'] = "0"
 
 import streamlit as st
 from transformers import AutoProcessor, AutoTokenizer, AutoModel, AutoModelForCausalLM, LlavaNextForConditionalGeneration, AutoModelForZeroShotObjectDetection
 from PIL import Image, ImageDraw, ImageColor, ImageFont
+from peft import PeftModel
 import numpy as np
 import torch
 import ast
@@ -49,6 +50,7 @@ def load_models():
                                                 attn_implementation='flash_attention_2',
                                                 cache_dir='/mnt/esperanto/et/huggingface/hub',
                                                 )
+    model_llm = PeftModel.from_pretrained(model_llm, adapter_name)
                         
     return model_itt, processor_itt, model_segmentation, processor_segmentation, model_embeddings, tokenizer_embeddings, model_llm, tokenizer_llm
 
