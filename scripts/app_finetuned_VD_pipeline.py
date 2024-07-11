@@ -1,5 +1,5 @@
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = "0"
+os.environ['CUDA_VISIBLE_DEVICES'] = "2"
 
 import streamlit as st
 from transformers import AutoProcessor, AutoTokenizer, AutoModel, AutoModelForCausalLM, LlavaNextForConditionalGeneration, AutoModelForZeroShotObjectDetection
@@ -15,7 +15,7 @@ image_to_text_model = 'llava-hf/llava-v1.6-mistral-7b-hf'
 segmentation_model = "IDEA-Research/grounding-dino-base"
 embeddings_model = 'Alibaba-NLP/gte-large-en-v1.5'
 llm_model = "microsoft/Phi-3-mini-4k-instruct"
-adapter_name = "phi3-mini-VD/checkpoint-10000"
+adapter_name = "../models/phi3-mini-VD/checkpoint-20000"
 
 #def fcts
 def load_models():
@@ -62,7 +62,7 @@ def get_labels_color(labels):
 
     return dict(labels_to_colors)
 
-def save_image_with_boxes(image, segments, path='./output_image.jpg'):
+def save_image_with_boxes(image, segments, path='../output_image.jpg'):
     boxes, labels, scores = segments[0]['boxes'], segments[0]['labels'], segments[0]['scores']
     
     labels_to_colors = get_labels_color(labels)
@@ -378,7 +378,7 @@ def show_page1():
 
         segments_postprocessed = post_processing(model_embeddings, tokenizer_embeddings, segments)
 
-        output_path = save_image_with_boxes(image, segments_postprocessed,'data/output_examples/output_image.jpg')
+        output_path = save_image_with_boxes(image, segments_postprocessed,'../data/output_examples/output_image.jpg')
     
     if output_path is not None:
         output_image = Image.open(output_path).convert('RGB')
@@ -389,7 +389,7 @@ def show_page1():
             segments_postprocessed[0]['title'] = title
             outputs = run_image_description_phi(segments_postprocessed, model_llm, tokenizer_llm, image)
 
-            st.write(outputs)
+            st.write(outputs.strip(' '))
 
 
 

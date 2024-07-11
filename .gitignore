@@ -4,4 +4,4 @@ data/train2014_descriptive_texts.json
 data/val2014_descriptive_texts.json
 wandb/
 models/phi3-mini-VD/*
-!models/phi3-mini-VD/checkpoint-10000
+!models/phi3-mini-VD/checkpoint-20000
