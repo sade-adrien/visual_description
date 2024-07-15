@@ -6,4 +6,3 @@ wandb/
 models/*
 !models/phi3-mini-VD/checkpoint-20000
 !models/llava-v1.6-vicuna-7b-VD/checkpoint-12000
-LLaVA-TBD
