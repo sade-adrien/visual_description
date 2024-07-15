@@ -22,7 +22,7 @@ Alternatively, we also try to fine-tune llava (LLaVA-v1.6-vicuna-7b) directly (t
 
 We again applied LoRA to all attention matrices for 20k steps. It takes ~5h on one A100. (We keep the 12k checkpoint as beyond this we observe some overfitting.)
 
-After analyzing the results, the whole pipeline with a fine-tuned Phi3-mini performs consistently better than just using a fine-tuned LLaVA (eval_loss=0.52 vs. 0.87). Some result examples are available in the table output_examples/Visual_Description_Fine-tuned_Pipeline_Examples.xlsx .
+After analyzing the results, the whole pipeline with a fine-tuned Phi3-mini performs consistently better than just using a fine-tuned LLaVA (eval_loss=0.52 vs. 0.87). Some result examples are available in the table output_examples/Visual_Description_Fine-tuned_Pipeline_Examples.pdf .
 
 ![Segmentation with Grounding DINO](https://github.com/sade-adrien/visual_description/blob/master/data/output_examples/output_image.jpg)
 
