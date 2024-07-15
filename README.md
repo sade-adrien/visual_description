@@ -18,7 +18,7 @@ The actual fine-tuning is performed on Phi3-mini with LoRA applied to all attent
 
 ## Fine-tuning 2
 
-Alternatively, we also try to fine-tune llava (LLaVA-v1.6-vicuna-7b) directly (the llm) with the generated dataset (see finetune_task_lora.sh and train2014_llava.json). In this case, we don't need the bounding boxes or labels, as we only feed the images along with the descriptive text.
+Alternatively, we also try to fine-tune llava (LLaVA-v1.6-vicuna-7b) directly (the llm) with the generated dataset (see finetune_task_lora.sh and train2014_llava.json). In this case, we don't need the bounding boxes or labels, as we only feed the images along with the descriptive text. (Note: we slightly modified the train.py file from LLaVA repository to evaluate the model during training on the eval dataset and allow for apple-to-apple comparison of our models.)
 
 We again applied LoRA to all attention matrices for 20k steps. It takes ~5h on one A100. (We keep the 12k checkpoint as beyond this we observe some overfitting.)
 
