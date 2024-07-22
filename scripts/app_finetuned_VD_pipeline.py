@@ -1,5 +1,5 @@
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = "2"
+os.environ['CUDA_VISIBLE_DEVICES'] = "0"
 
 import streamlit as st
 from transformers import AutoProcessor, AutoTokenizer, AutoModel, AutoModelForCausalLM, LlavaNextForConditionalGeneration, AutoModelForZeroShotObjectDetection
@@ -334,7 +334,7 @@ def run_image_description_phi(segments, model, tokenizer, image):
 
 def show_page1():
     st.set_page_config(layout="wide")
-    st.title('Visual Description / Automatic Annotation')
+    st.title('Visual Description for Visually Impaired People')
     col1, col2 = st.columns(2)
     output_path = None
 
